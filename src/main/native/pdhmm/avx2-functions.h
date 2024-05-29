@@ -178,6 +178,79 @@ inline void print_mask(VEC_MASK_TYPE mask)
     INT_TYPE *temp = new INT_TYPE[SIMD_WIDTH_DOUBLE];
     VEC_STORE_INT(temp, mask);
     for (int i = 0; i < SIMD_WIDTH_DOUBLE; i++)
-        printf("%d ", temp[i]);
+        printf("%d ", int32_t(temp[i]));
     printf("\n");
+}
+
+inline VEC_MASK_TYPE VEC_CMP_LE_INT_P(VEC_INT_TYPE __v1, VEC_INT_TYPE __v2, int32_t lineNumber)
+{
+    VEC_MASK_TYPE result = VEC_OR_MASK(VEC_CMP_LT_INT(__v1, __v2), VEC_CMP_EQ_INT(__v1, __v2));
+    // if (result == 0)
+    // {
+    //     printf("All 0 case hit in line_number %d\n", lineNumber);
+    // }
+    // else if (result == 0xFF)
+    // {
+    //     printf("All 1 case hit in line_number %d\n", lineNumber);
+    // }
+    // else
+    // {
+    //     printf("Mix case hit in line_number %d\n", lineNumber);
+    // }
+
+    return result;
+}
+
+inline VEC_MASK_TYPE VEC_CMP_LT_INT_P(VEC_INT_TYPE __v1, VEC_INT_TYPE __v2, int32_t lineNumber)
+{
+    VEC_MASK_TYPE result = VEC_CMP_LT_INT(__v1, __v2);
+    // if (result == 0)
+    // {
+    //     printf("All 0 case hit in line_number %d\n", lineNumber);
+    // }
+    // else if (result == 0xFF)
+    // {
+    //     printf("All 1 case hit in line_number %d\n", lineNumber);
+    // }
+    // else
+    // {
+    //     printf("Mix case hit in line_number %d\n", lineNumber);
+    // }
+
+    return result;
+}
+
+inline void VEC_CHECK_MASK(VEC_MASK_TYPE result, int32_t lineNumber)
+{
+    // if (result == 0)
+    // {
+    //     printf("All 0 case hit in line_number %d\n", lineNumber);
+    // }
+    // else if (result == 0xFF)
+    // {
+    //     printf("All 1 case hit in line_number %d\n", lineNumber);
+    // }
+    // else
+    // {
+    //     printf("Mix case hit in line_number %d\n", lineNumber);
+    // }
+}
+
+inline VEC_MASK_TYPE VEC_CMP_EQ_INT_P(VEC_INT_TYPE __v1, VEC_INT_TYPE __v2, int32_t lineNumber)
+{
+    VEC_MASK_TYPE result = VEC_CMP_EQ_INT(__v1, __v2);
+    // if (result == 0)
+    // {
+    //     printf("All 0 case hit in line_number %d\n", lineNumber);
+    // }
+    // else if (result == 0xFF)
+    // {
+    //     printf("All 1 case hit in line_number %d\n", lineNumber);
+    // }
+    // else
+    // {
+    //     printf("Mix case hit in line_number %d\n", lineNumber);
+    // }
+
+    return result;
 }

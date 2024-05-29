@@ -160,5 +160,99 @@
 
 inline void print_mask(VEC_MASK_TYPE mask)
 {
-    printf("%d\n", mask);
+    printf("%d\n", int32_t(mask));
+}
+
+inline VEC_MASK_TYPE VEC_CMP_EQ_INT_P(VEC_INT_TYPE __v1, VEC_INT_TYPE __v2, int32_t lineNumber)
+{
+    VEC_MASK_TYPE result = _mm512_cmp_epi64_mask(__v1, __v2, _MM_CMPINT_EQ);
+    // if (result == 0)
+    // {
+    //     printf("All 0 case hit in line_number %d\n", lineNumber);
+    // }
+    // else if (result == 0xFF)
+    // {
+    //     printf("All 1 case hit in line_number %d\n", lineNumber);
+    // }
+    // else
+    // {
+    //     printf("Mix case hit in line_number %d\n", lineNumber);
+    // }
+
+    return result;
+}
+
+inline VEC_MASK_TYPE VEC_CMP_EQ_PD_P(VEC_DOUBLE_TYPE __v1, VEC_DOUBLE_TYPE __v2, int32_t lineNumber)
+{
+    VEC_MASK_TYPE result = _mm512_cmp_pd_mask(__v1, __v2, _CMP_EQ_OQ);
+    // if (result == 0)
+    // {
+    //     printf("All 0 case hit in line_number %d\n", lineNumber);
+    // }
+    // else if (result == 0xFF)
+    // {
+    //     printf("All 1 case hit in line_number %d\n", lineNumber);
+    // }
+    // else
+    // {
+    //     printf("Mix case hit in line_number %d\n", lineNumber);
+    // }
+
+    return result;
+}
+
+inline VEC_MASK_TYPE VEC_CMP_LE_INT_P(VEC_INT_TYPE __v1, VEC_INT_TYPE __v2, int32_t lineNumber)
+{
+    VEC_MASK_TYPE result = _mm512_cmp_epi64_mask(__v1, __v2, _MM_CMPINT_LE);
+    // if (result == 0)
+    // {
+    //     printf("All 0 case hit in line_number %d\n", lineNumber);
+    // }
+    // else if (result == 0xFF)
+    // {
+    //     printf("All 1 case hit in line_number %d\n", lineNumber);
+    // }
+    // else
+    // {
+    //     printf("Mix case hit in line_number %d\n", lineNumber);
+    // }
+
+    return result;
+}
+
+#define VEC_CMP_NE_INT(__v1, __v2) \
+    _mm512_cmp_epi64_mask(__v1, __v2, _MM_CMPINT_NE)
+
+inline VEC_MASK_TYPE VEC_CMP_LT_INT_P(VEC_INT_TYPE __v1, VEC_INT_TYPE __v2, int32_t lineNumber)
+{
+    VEC_MASK_TYPE result = _mm512_cmp_epi64_mask(__v1, __v2, _MM_CMPINT_LT);
+    // if (result == 0)
+    // {
+    //     printf("All 0 case hit in line_number %d\n", lineNumber);
+    // }
+    // else if (result == 0xFF)
+    // {
+    //     printf("All 1 case hit in line_number %d\n", lineNumber);
+    // }
+    // else
+    // {
+    //     printf("Mix case hit in line_number %d\n", lineNumber);
+    // }
+    return result;
+}
+
+inline void VEC_CHECK_MASK(VEC_MASK_TYPE result, int32_t lineNumber)
+{
+    // if (result == 0)
+    // {
+    //     printf("All 0 case hit in line_number %d\n", lineNumber);
+    // }
+    // else if (result == 0xFF)
+    // {
+    //     printf("All 1 case hit in line_number %d\n", lineNumber);
+    // }
+    // else
+    // {
+    //     printf("Mix case hit in line_number %d\n", lineNumber);
+    // }
 }

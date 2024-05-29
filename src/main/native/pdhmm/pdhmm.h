@@ -27,6 +27,18 @@
 #ifdef linux
 #include <omp.h>
 #endif
+// #include "avx512-functions.h"
+
+void print_vec_pd(VEC_DOUBLE_TYPE vec)
+{
+    double *temp = (double *)_mm_malloc(SIMD_WIDTH_DOUBLE * sizeof(double), ALIGN_SIZE);
+    VEC_STORE_PD(temp, vec);
+    printf("%f\n", temp[0]);
+    // for (int i = 0; i < SIMD_WIDTH_DOUBLE; i++)
+    // {
+    // }
+    _mm_free(temp);
+}
 
 inline int32_t allocateVec(double *&matchMatrixVec, double *&insertionMatrixVec, double *&deletionMatrixVec, double *&branchMatchMatrixVec, double *&branchInsertionMatrixVec, double *&branchDeletionMatrixVec, double *&transitionVec, double *&priorVec, bool *&constantsAreInitialized, bool *&initialized, INT_TYPE *&prev_hap_bases_lengths, const int32_t maxReadLength, const int32_t maxHaplotypeLength, const int32_t totalThreads)
 {
@@ -66,18 +78,39 @@ inline int32_t allocateVec(double *&matchMatrixVec, double *&insertionMatrixVec,
         return PDHMM_MEMORY_ALLOCATION_FAILED;
     }
 
-    memset(matchMatrixVec, 0, sizeOfTables);
-    memset(insertionMatrixVec, 0, sizeOfTables);
-    memset(deletionMatrixVec, 0, sizeOfTables);
-    memset(branchMatchMatrixVec, 0, sizeOfTables);
-    memset(branchInsertionMatrixVec, 0, sizeOfTables);
-    memset(branchDeletionMatrixVec, 0, sizeOfTables);
+    // memset(matchMatrixVec, 0, sizeOfTables);
+    // memset(insertionMatrixVec, 0, sizeOfTables);
+    // memset(deletionMatrixVec, 0, sizeOfTables);
+    // memset(branchMatchMatrixVec, 0, sizeOfTables);
+    // memset(branchInsertionMatrixVec, 0, sizeOfTables);
+    // memset(branchDeletionMatrixVec, 0, sizeOfTables);
 
-    memset(transitionVec, 0, TRANS_PROB_ARRAY_LENGTH * paddedMaxReadLength * SIMD_WIDTH_DOUBLE * totalThreads * sizeof(double));
-    memset(priorVec, 0, paddedMaxHaplotypeLength * paddedMaxReadLength * SIMD_WIDTH_DOUBLE * totalThreads * sizeof(double));
+    for (int32_t i = 0; i < paddedMaxHaplotypeLength * SIMD_WIDTH_DOUBLE * totalThreads; i++)
+    {
+        matchMatrixVec[i] = 0;
+        insertionMatrixVec[i] = 0;
+        deletionMatrixVec[i] = 0;
+        branchMatchMatrixVec[i] = 0;
+        branchInsertionMatrixVec[i] = 0;
+        branchDeletionMatrixVec[i] = 0;
+    }
 
-    memset(constantsAreInitialized, 0, totalThreads * sizeof(bool));
-    memset(initialized, 1, totalThreads * sizeof(bool));
+    for (int32_t i = 0; i < TRANS_PROB_ARRAY_LENGTH * paddedMaxReadLength * SIMD_WIDTH_DOUBLE * totalThreads; i++)
+        transitionVec[i] = 0;
+
+    for (int32_t i = 0; i < paddedMaxHaplotypeLength * paddedMaxReadLength * SIMD_WIDTH_DOUBLE * totalThreads; i++)
+        priorVec[i] = 0;
+
+    // memset(transitionVec, 0, TRANS_PROB_ARRAY_LENGTH * paddedMaxReadLength * SIMD_WIDTH_DOUBLE * totalThreads * sizeof(double));
+    // memset(priorVec, 0, paddedMaxHaplotypeLength * paddedMaxReadLength * SIMD_WIDTH_DOUBLE * totalThreads * sizeof(double));
+
+    // memset(constantsAreInitialized, 0, totalThreads * sizeof(bool));
+    // memset(initialized, 1, totalThreads * sizeof(bool));
+    for (int32_t i = 0; i < totalThreads; i++)
+    {
+        constantsAreInitialized[i] = false;
+        initialized[i] = true;
+    }
 
     return PDHMM_SUCCESS;
 }
@@ -102,12 +135,22 @@ inline void initializeVec(double *matchMatrixVec, double *insertionMatrixVec, do
     const int32_t paddedMaxHaplotypeLength = maxHaplotypeLength + 1;
     INT_TYPE sizeOfTables = paddedMaxHaplotypeLength * SIMD_WIDTH_DOUBLE * sizeof(double);
 
-    memset(matchMatrixVec, 0, sizeOfTables);
-    memset(insertionMatrixVec, 0, sizeOfTables);
-    memset(deletionMatrixVec, 0, sizeOfTables);
-    memset(branchMatchMatrixVec, 0, sizeOfTables);
-    memset(branchInsertionMatrixVec, 0, sizeOfTables);
-    memset(branchDeletionMatrixVec, 0, sizeOfTables);
+    // memset(matchMatrixVec, 0, sizeOfTables);
+    // memset(insertionMatrixVec, 0, sizeOfTables);
+    // memset(deletionMatrixVec, 0, sizeOfTables);
+    // memset(branchMatchMatrixVec, 0, sizeOfTables);
+    // memset(branchInsertionMatrixVec, 0, sizeOfTables);
+    // memset(branchDeletionMatrixVec, 0, sizeOfTables);
+
+    for (int32_t i = 0; i < paddedMaxHaplotypeLength * SIMD_WIDTH_DOUBLE; i++)
+    {
+        matchMatrixVec[i] = 0;
+        insertionMatrixVec[i] = 0;
+        deletionMatrixVec[i] = 0;
+        branchMatchMatrixVec[i] = 0;
+        branchInsertionMatrixVec[i] = 0;
+        branchDeletionMatrixVec[i] = 0;
+    }
 
     constantsAreInitialized = false;
     initialized = true;
@@ -133,14 +176,16 @@ inline VEC_DOUBLE_TYPE matchToMatchProbFun(VEC_INT_TYPE insQual, VEC_INT_TYPE de
     VEC_INT_TYPE minQual = VEC_MIN_INT(insQual, delQual);
     VEC_INT_TYPE maxQual = VEC_MAX_INT(insQual, delQual);
 
-    VEC_MASK_TYPE ltzero = VEC_CMP_LT_INT(minQual, VEC_SET0_INT());
+    VEC_MASK_TYPE ltzero = VEC_CMP_LT_INT_P(minQual, VEC_SET0_INT(), __LINE__);
+    // VEC_MASK_TYPE ltzero = VEC_CMP_LT_INT(minQual, VEC_SET0_INT());
     if (VEC_CMP_NE_MASK(ltzero, 0))
     {
         status = PDHMM_INPUT_DATA_ERROR;
         return VEC_SET1_PD(-1.0);
     }
 
-    VEC_MASK_TYPE ltMaxQual = VEC_CMP_LT_INT(VEC_SET1_INT(MAX_QUAL), maxQual);
+    // VEC_MASK_TYPE ltMaxQual = VEC_CMP_LT_INT(VEC_SET1_INT(MAX_QUAL), maxQual);
+    VEC_MASK_TYPE ltMaxQual = VEC_CMP_LT_INT_P(VEC_SET1_INT(MAX_QUAL), maxQual, __LINE__);
     if (VEC_CMP_NE_MASK(ltMaxQual, 0)) // there are some qual values which cannot be fetched from the matchToMatchProb cache.
     {
         double *resultScalar = (double *)_mm_malloc(SIMD_WIDTH_DOUBLE * sizeof(double), 64);
@@ -182,17 +227,20 @@ inline int32_t qualToTransProbs(double *dest, VEC_INT_TYPE insQual, VEC_INT_TYPE
 {
     VEC_INT_TYPE zeroVec = VEC_SET0_INT();
 
-    VEC_MASK_TYPE mask1 = VEC_CMP_LT_INT(insQual, zeroVec);
+    // VEC_MASK_TYPE mask1 = VEC_CMP_LT_INT(insQual, zeroVec);
+    VEC_MASK_TYPE mask1 = VEC_CMP_LT_INT_P(insQual, zeroVec, __LINE__);
     if (VEC_CMP_NE_MASK(mask1, 0))
     {
         return PDHMM_INPUT_DATA_ERROR;
     }
-    mask1 = VEC_CMP_LT_INT(delQual, zeroVec);
+    // mask1 = VEC_CMP_LT_INT(delQual, zeroVec);
+    mask1 = VEC_CMP_LT_INT_P(delQual, zeroVec, __LINE__);
     if (VEC_CMP_NE_MASK(mask1, 0))
     {
         return PDHMM_INPUT_DATA_ERROR;
     }
-    mask1 = VEC_CMP_LT_INT(gcp, zeroVec);
+    // mask1 = VEC_CMP_LT_INT(gcp, zeroVec);
+    mask1 = VEC_CMP_LT_INT_P(gcp, zeroVec, __LINE__);
     if (VEC_CMP_NE_MASK(mask1, 0))
     {
         return PDHMM_INPUT_DATA_ERROR;
@@ -272,11 +320,14 @@ inline VEC_MASK_TYPE isBasePDMatching(VEC_INT_TYPE xPrime, VEC_INT_TYPE hapPDBas
 inline VEC_INT_TYPE toPrime(VEC_INT_TYPE x)
 {
     VEC_INT_TYPE result = AVec;
-    VEC_MASK_TYPE mask = VEC_CMP_EQ_INT(x, VEC_SET1_INT('C'));
+    // VEC_MASK_TYPE mask = VEC_CMP_EQ_INT(x, VEC_SET1_INT('C'));
+    VEC_MASK_TYPE mask = VEC_CMP_EQ_INT_P(x, VEC_SET1_INT('C'), __LINE__);
     result = VEC_BLEND_INT(result, CVec, mask);
-    mask = VEC_CMP_EQ_INT(x, VEC_SET1_INT('G'));
+    // mask = VEC_CMP_EQ_INT(x, VEC_SET1_INT('G'));
+    mask = VEC_CMP_EQ_INT_P(x, VEC_SET1_INT('G'), __LINE__);
     result = VEC_BLEND_INT(result, GVec, mask);
-    mask = VEC_CMP_EQ_INT(x, VEC_SET1_INT('T'));
+    // mask = VEC_CMP_EQ_INT(x, VEC_SET1_INT('T'));
+    mask = VEC_CMP_EQ_INT_P(x, VEC_SET1_INT('T'), __LINE__);
     result = VEC_BLEND_INT(result, TVec, mask);
     return result;
 }
@@ -284,7 +335,7 @@ inline VEC_INT_TYPE toPrime(VEC_INT_TYPE x)
 inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYPE *haplotypePDBases, const INT_TYPE *readBases, INT_TYPE *readQuals, INT_TYPE startIndex, INT_TYPE currMaxHaplotypeLength, INT_TYPE currMaxReadLength, double *priorVec, const double *qualToErrorProbCache, int32_t maxHaplotypeLength, INT_TYPE readArrayLen, INT_TYPE hapArrayLen, INT_TYPE priorVecLen)
 {
     // initialize the prior matrix for all combinations of read x haplotype bases
-    INT_TYPE paddedMaxHaplotypeLength = maxHaplotypeLength + 1;
+    int32_t paddedMaxHaplotypeLength = maxHaplotypeLength + 1;
     VEC_INT_TYPE nVec = VEC_SET1_INT((int8_t)'N');
     VEC_INT_TYPE aVec = VEC_SET1_INT('a');
     VEC_INT_TYPE caseDiff = VEC_SET1_INT(32);
@@ -314,7 +365,8 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
         VEC_DOUBLE_TYPE trueVal1 = qualToProb(qual, qualToErrorProbCache);
         VEC_DOUBLE_TYPE falseVal1 = VEC_DIV_PD(qualToErrorProb(qual, qualToErrorProbCache), VEC_SET1_PD(3.0));
         VEC_MASK_TYPE maskx1 = VEC_CMP_EQ_INT(x1, nVec);
-        VEC_MASK_TYPE isLower = VEC_CMP_LE_INT(aVec, x1);
+        // VEC_MASK_TYPE isLower = VEC_CMP_LE_INT(aVec, x1);
+        VEC_MASK_TYPE isLower = VEC_CMP_LE_INT_P(aVec, x1, __LINE__);
         VEC_INT_TYPE x1Prime = VEC_SUB_INT(x1, caseDiff);
         x1Prime = VEC_BLEND_INT(x1, x1Prime, isLower);
         x1Prime = toPrime(x1Prime);
@@ -325,7 +377,8 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
         VEC_DOUBLE_TYPE trueVal2 = qualToProb(qual, qualToErrorProbCache);
         VEC_DOUBLE_TYPE falseVal2 = VEC_DIV_PD(qualToErrorProb(qual, qualToErrorProbCache), VEC_SET1_PD(3.0));
         VEC_MASK_TYPE maskx2 = VEC_CMP_EQ_INT(x2, nVec);
-        isLower = VEC_CMP_LE_INT(aVec, x2);
+        // isLower = VEC_CMP_LE_INT(aVec, x2);
+        isLower = VEC_CMP_LE_INT_P(aVec, x2, __LINE__);
         VEC_INT_TYPE x2Prime = VEC_SUB_INT(x2, caseDiff);
         x2Prime = VEC_BLEND_INT(x2, x2Prime, isLower);
         x2Prime = toPrime(x2Prime);
@@ -336,7 +389,8 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
         VEC_DOUBLE_TYPE trueVal3 = qualToProb(qual, qualToErrorProbCache);
         VEC_DOUBLE_TYPE falseVal3 = VEC_DIV_PD(qualToErrorProb(qual, qualToErrorProbCache), VEC_SET1_PD(3.0));
         VEC_MASK_TYPE maskx3 = VEC_CMP_EQ_INT(x3, nVec);
-        isLower = VEC_CMP_LE_INT(aVec, x3);
+        // isLower = VEC_CMP_LE_INT(aVec, x3);
+        isLower = VEC_CMP_LE_INT_P(aVec, x3, __LINE__);
         VEC_INT_TYPE x3Prime = VEC_SUB_INT(x3, caseDiff);
         x3Prime = VEC_BLEND_INT(x3, x3Prime, isLower);
         x3Prime = toPrime(x3Prime);
@@ -347,7 +401,8 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
         VEC_DOUBLE_TYPE trueVal4 = qualToProb(qual, qualToErrorProbCache);
         VEC_DOUBLE_TYPE falseVal4 = VEC_DIV_PD(qualToErrorProb(qual, qualToErrorProbCache), VEC_SET1_PD(3.0));
         VEC_MASK_TYPE maskx4 = VEC_CMP_EQ_INT(x4, nVec);
-        isLower = VEC_CMP_LE_INT(aVec, x4);
+        // isLower = VEC_CMP_LE_INT(aVec, x4);
+        isLower = VEC_CMP_LE_INT_P(aVec, x4, __LINE__);
         VEC_INT_TYPE x4Prime = VEC_SUB_INT(x4, caseDiff);
         x4Prime = VEC_BLEND_INT(x4, x4Prime, isLower);
         x4Prime = toPrime(x4Prime);
@@ -363,6 +418,7 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
             mask1 = VEC_OR_MASK(mask1, maskx1);
             mask1 = VEC_OR_MASK(mask1, maskY);
             mask1 = VEC_OR_MASK(mask1, isBasePDMatching(x1Prime, hapPDBase));
+            VEC_CHECK_MASK(mask1, __LINE__);
             VEC_DOUBLE_TYPE priorValue = VEC_BLEND_PD(falseVal1, trueVal1, mask1);
             index = (i + 1) * paddedMaxHaplotypeLength * SIMD_WIDTH_DOUBLE + (j + 1) * SIMD_WIDTH_DOUBLE;
             VEC_STORE_PD(priorVec + index, priorValue);
@@ -371,6 +427,7 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
             mask1 = VEC_OR_MASK(mask1, maskx2);
             mask1 = VEC_OR_MASK(mask1, maskY);
             mask1 = VEC_OR_MASK(mask1, isBasePDMatching(x2Prime, hapPDBase));
+            VEC_CHECK_MASK(mask1, __LINE__);
             priorValue = VEC_BLEND_PD(falseVal2, trueVal2, mask1);
             index = (i + 2) * paddedMaxHaplotypeLength * SIMD_WIDTH_DOUBLE + (j + 1) * SIMD_WIDTH_DOUBLE;
             VEC_STORE_PD(priorVec + index, priorValue);
@@ -379,6 +436,7 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
             mask1 = VEC_OR_MASK(mask1, maskx3);
             mask1 = VEC_OR_MASK(mask1, maskY);
             mask1 = VEC_OR_MASK(mask1, isBasePDMatching(x3Prime, hapPDBase));
+            VEC_CHECK_MASK(mask1, __LINE__);
             priorValue = VEC_BLEND_PD(falseVal3, trueVal3, mask1);
             index = (i + 3) * paddedMaxHaplotypeLength * SIMD_WIDTH_DOUBLE + (j + 1) * SIMD_WIDTH_DOUBLE;
             VEC_STORE_PD(priorVec + index, priorValue);
@@ -387,6 +445,7 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
             mask1 = VEC_OR_MASK(mask1, maskx4);
             mask1 = VEC_OR_MASK(mask1, maskY);
             mask1 = VEC_OR_MASK(mask1, isBasePDMatching(x4Prime, hapPDBase));
+            VEC_CHECK_MASK(mask1, __LINE__);
             priorValue = VEC_BLEND_PD(falseVal4, trueVal4, mask1);
             index = (i + 4) * paddedMaxHaplotypeLength * SIMD_WIDTH_DOUBLE + (j + 1) * SIMD_WIDTH_DOUBLE;
             VEC_STORE_PD(priorVec + index, priorValue);
@@ -401,7 +460,8 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
         VEC_DOUBLE_TYPE trueVal1 = qualToProb(qual, qualToErrorProbCache);
         VEC_DOUBLE_TYPE falseVal1 = VEC_DIV_PD(qualToErrorProb(qual, qualToErrorProbCache), VEC_SET1_PD(3.0));
         VEC_MASK_TYPE maskx1 = VEC_CMP_EQ_INT(x1, nVec);
-        VEC_MASK_TYPE isLower = VEC_CMP_LE_INT(aVec, x1);
+        // VEC_MASK_TYPE isLower = VEC_CMP_LE_INT(aVec, x1);
+        VEC_MASK_TYPE isLower = VEC_CMP_LE_INT_P(aVec, x1, __LINE__);
         VEC_INT_TYPE x1Prime = VEC_SUB_INT(x1, caseDiff);
         x1Prime = VEC_BLEND_INT(x1, x1Prime, isLower);
         x1Prime = toPrime(x1Prime);
@@ -415,6 +475,7 @@ inline int32_t initializePriorsVec(const INT_TYPE *haplotypeBases, const INT_TYP
             mask1 = VEC_OR_MASK(mask1, maskx1);
             mask1 = VEC_OR_MASK(mask1, VEC_CMP_EQ_INT(y, nVec));
             mask1 = VEC_OR_MASK(mask1, isBasePDMatching(x1Prime, hapPDBase));
+            VEC_CHECK_MASK(mask1, __LINE__);
             VEC_DOUBLE_TYPE priorValue = VEC_BLEND_PD(falseVal1, trueVal1, mask1);
             index = (i + 1) * paddedMaxHaplotypeLength * SIMD_WIDTH_DOUBLE + (j + 1) * SIMD_WIDTH_DOUBLE;
             VEC_STORE_PD(priorVec + index, priorValue);
@@ -434,8 +495,10 @@ inline void recursionFunction(VEC_DOUBLE_TYPE mm_diag, VEC_DOUBLE_TYPE mm_top, V
                               VEC_INT_TYPE afterState, VEC_INT_TYPE &currentState, VEC_MASK_TYPE rowWrite, const INT_TYPE *hap_pdbases_vec,
                               INT_TYPE i, INT_TYPE j, INT_TYPE paddedMaxHaplotypeLength, const double *priorVec)
 {
-    VEC_MASK_TYPE maskInside = VEC_CMP_EQ_INT(currentState, insideState);
-    VEC_MASK_TYPE maskAfter = VEC_CMP_EQ_INT(currentState, afterState);
+    // VEC_MASK_TYPE maskInside = VEC_CMP_EQ_INT(currentState, insideState);
+    VEC_MASK_TYPE maskInside = VEC_CMP_EQ_INT_P(currentState, insideState, __LINE__);
+    // VEC_MASK_TYPE maskAfter = VEC_CMP_EQ_INT(currentState, afterState);
+    VEC_MASK_TYPE maskAfter = VEC_CMP_EQ_INT_P(currentState, afterState, __LINE__);
     VEC_DOUBLE_TYPE max_mm_left = VEC_MAX_PD(mm_left, bmm_left);
     VEC_DOUBLE_TYPE max_im_left = VEC_MAX_PD(im_left, bim_left);
     VEC_DOUBLE_TYPE max_dm_left = VEC_MAX_PD(dm_left, bdm_left);
@@ -466,6 +529,61 @@ inline void recursionFunction(VEC_DOUBLE_TYPE mm_diag, VEC_DOUBLE_TYPE mm_top, V
     INT_TYPE currIndex = i * paddedMaxHaplotypeLength * SIMD_WIDTH_DOUBLE + (j)*SIMD_WIDTH_DOUBLE;
     VEC_DOUBLE_TYPE pr = VEC_LOAD_PD(priorVec + currIndex);
 
+    // if (i <= 2)
+    // {
+    //     printf("i = %d j = %d\n", int32_t(i), int32_t(j));
+    //     printf("bmm_curr = ");
+    //     print_vec_pd(bmm_curr);
+    //     printf("bim_curr = ");
+    //     print_vec_pd(bim_curr);
+    //     printf("bdm_curr = ");
+    //     print_vec_pd(bdm_curr);
+
+    //     printf("currPrior = ");
+    //     print_vec_pd(pr);
+    //     printf("mmDiag = ");
+    //     print_vec_pd(mm_diag);
+    //     printf("imDiag = ");
+    //     print_vec_pd(im_diag);
+    //     printf("dmDiag = ");
+    //     print_vec_pd(dm_diag);
+
+    //     printf("currTransition[matchToMatch] = ");
+    //     print_vec_pd(tmm);
+
+    //     printf("currTransition[indelToMatch] = ");
+    //     print_vec_pd(tim);
+
+    //     printf("mm_left = ");
+    //     print_vec_pd(mm_left);
+
+    //     printf("tmd = ");
+    //     print_vec_pd(tmd);
+
+    //     printf("dm_left = ");
+    //     print_vec_pd(dm_left);
+
+    //     printf("tdd = ");
+    //     print_vec_pd(tdd);
+
+    //     printf("bdm_left = ");
+    //     print_vec_pd(bdm_left);
+
+    //     printf("max_dm_left = ");
+    //     print_vec_pd(max_dm_left);
+
+    //     printf("maskAfter = ");
+    //     print_mask(maskAfter);
+
+    //     printf("mm_left * tmd = ");
+    //     print_vec_pd(VEC_MUL_PD(mm_left, tmd));
+
+    //     printf("dm_left * tdd = ");
+    //     print_vec_pd(VEC_MUL_PD(dm_left, tdd));
+
+    //     printf("dm_curr = ");
+    //     print_vec_pd(VEC_ADD_PD(VEC_MUL_PD(mm_left, tmd), VEC_MUL_PD(dm_left, tdd)));
+    // }
     mm_curr = VEC_MUL_PD(pr,
                          VEC_ADD_PD(VEC_MUL_PD(mm_diag, tmm),
                                     VEC_ADD_PD(VEC_MUL_PD(im_diag, tim), VEC_MUL_PD(dm_diag, tim))));
@@ -476,7 +594,8 @@ inline void recursionFunction(VEC_DOUBLE_TYPE mm_diag, VEC_DOUBLE_TYPE mm_top, V
     im_curr = VEC_ADD_PD(VEC_MUL_PD(mm_top, tmi), VEC_MUL_PD(im_top, tii));
 
     VEC_INT_TYPE hap_pb_j_off = VEC_LOAD_INT(hap_pdbases_vec + (j - OFF) * SIMD_WIDTH_DOUBLE);
-    VEC_MASK_TYPE mask_hap_pb = VEC_CMP_EQ_INT(VEC_AND_INT(hap_pb_j_off, del_end), del_end);
+    // VEC_MASK_TYPE mask_hap_pb = VEC_CMP_EQ_INT(VEC_AND_INT(hap_pb_j_off, del_end), del_end);
+    VEC_MASK_TYPE mask_hap_pb = VEC_CMP_EQ_INT_P(VEC_AND_INT(hap_pb_j_off, del_end), del_end, __LINE__);
 
     VEC_DOUBLE_TYPE im_curr_alt = VEC_ADD_PD(
         VEC_MUL_PD(VEC_MAX_PD(bmm_top, mm_top), tmi),
@@ -484,16 +603,30 @@ inline void recursionFunction(VEC_DOUBLE_TYPE mm_diag, VEC_DOUBLE_TYPE mm_top, V
 
     im_curr = VEC_BLEND_PD(im_curr, im_curr_alt, mask_hap_pb);
 
+    // if (i <= 2)
+    // {
+    //     printf("mm_curr = ");
+    //     print_vec_pd(mm_curr);
+
+    //     printf("dm_curr = ");
+    //     print_vec_pd(dm_curr);
+
+    //     printf("im_curr = ");
+    //     print_vec_pd(im_curr);
+    // }
+
     // State Change
     currentState = VEC_BLEND_INT(currentState, normalState, maskAfter);
 
     VEC_INT_TYPE hap_pb_j_minus_one = VEC_LOAD_INT(hap_pdbases_vec + (j - 1) * SIMD_WIDTH_DOUBLE);
 
-    mask_hap_pb = VEC_CMP_EQ_INT(VEC_AND_INT(hap_pb_j_minus_one, del_start), del_start);
+    // mask_hap_pb = VEC_CMP_EQ_INT(VEC_AND_INT(hap_pb_j_minus_one, del_start), del_start);
+    mask_hap_pb = VEC_CMP_EQ_INT_P(VEC_AND_INT(hap_pb_j_minus_one, del_start), del_start, __LINE__);
 
     currentState = VEC_BLEND_INT(currentState, insideState, mask_hap_pb);
 
-    mask_hap_pb = VEC_CMP_EQ_INT(VEC_AND_INT(hap_pb_j_minus_one, del_end), del_end);
+    // mask_hap_pb = VEC_CMP_EQ_INT(VEC_AND_INT(hap_pb_j_minus_one, del_end), del_end);
+    mask_hap_pb = VEC_CMP_EQ_INT_P(VEC_AND_INT(hap_pb_j_minus_one, del_end), del_end, __LINE__);
 
     currentState = VEC_BLEND_INT(currentState, afterState, mask_hap_pb);
 
@@ -554,13 +687,17 @@ inline int32_t computationStep(const INT_TYPE *paddedReadLengths, const INT_TYPE
         currentState4 = VEC_SET1_INT(NORMAL);
 
         VEC_INT_TYPE iVec1 = VEC_SET1_INT(i);
-        VEC_MASK_TYPE rowWrite1 = VEC_CMP_LT_INT(iVec1, paddedReadLenVec);
+        // VEC_MASK_TYPE rowWrite1 = VEC_CMP_LT_INT(iVec1, paddedReadLenVec);
+        VEC_MASK_TYPE rowWrite1 = VEC_CMP_LT_INT_P(iVec1, paddedReadLenVec, __LINE__);
         VEC_INT_TYPE iVec2 = VEC_SET1_INT(i + 1);
-        VEC_MASK_TYPE rowWrite2 = VEC_CMP_LT_INT(iVec2, paddedReadLenVec);
+        // VEC_MASK_TYPE rowWrite2 = VEC_CMP_LT_INT(iVec2, paddedReadLenVec);
+        VEC_MASK_TYPE rowWrite2 = VEC_CMP_LT_INT_P(iVec2, paddedReadLenVec, __LINE__);
         VEC_INT_TYPE iVec3 = VEC_SET1_INT(i + 2);
-        VEC_MASK_TYPE rowWrite3 = VEC_CMP_LT_INT(iVec3, paddedReadLenVec);
+        // VEC_MASK_TYPE rowWrite3 = VEC_CMP_LT_INT(iVec3, paddedReadLenVec);
+        VEC_MASK_TYPE rowWrite3 = VEC_CMP_LT_INT_P(iVec3, paddedReadLenVec, __LINE__);
         VEC_INT_TYPE iVec4 = VEC_SET1_INT(i + 3);
-        VEC_MASK_TYPE rowWrite4 = VEC_CMP_LT_INT(iVec4, paddedReadLenVec);
+        // VEC_MASK_TYPE rowWrite4 = VEC_CMP_LT_INT(iVec4, paddedReadLenVec);
+        VEC_MASK_TYPE rowWrite4 = VEC_CMP_LT_INT_P(iVec4, paddedReadLenVec, __LINE__);
 
         INT_TYPE index = i * TRANS_PROB_ARRAY_LENGTH * SIMD_WIDTH_DOUBLE;
 
@@ -779,7 +916,8 @@ inline int32_t computationStep(const INT_TYPE *paddedReadLengths, const INT_TYPE
         //  assumption made: current state can be set to normal at start of each row.
         currentState1 = VEC_SET1_INT(NORMAL);
         VEC_INT_TYPE iVec1 = VEC_SET1_INT(i);
-        VEC_MASK_TYPE rowWrite1 = VEC_CMP_LT_INT(iVec1, paddedReadLenVec);
+        // VEC_MASK_TYPE rowWrite1 = VEC_CMP_LT_INT(iVec1, paddedReadLenVec);
+        VEC_MASK_TYPE rowWrite1 = VEC_CMP_LT_INT_P(iVec1, paddedReadLenVec, __LINE__);
         INT_TYPE index = i * TRANS_PROB_ARRAY_LENGTH * SIMD_WIDTH_DOUBLE;
 
         VEC_DOUBLE_TYPE tmm1 = VEC_LOAD_PD(transitionVec + index);
@@ -820,10 +958,9 @@ inline int32_t computationStep(const INT_TYPE *paddedReadLengths, const INT_TYPE
         VEC_DOUBLE_TYPE bdm_1;
         VEC_DOUBLE_TYPE bdm_2 = VEC_SET1_PD(0);
         VEC_DOUBLE_TYPE bdm_3;
-
-        for (int32_t j = 1; j < currMaxPaddedHaplotypeLength; j++) // START INDEX SET TO 1
+        for (INT_TYPE j = 1; j < currMaxPaddedHaplotypeLength; j++) // START INDEX SET TO 1
         {
-            int32_t topIndex = (j)*SIMD_WIDTH_DOUBLE;
+            INT_TYPE topIndex = (j)*SIMD_WIDTH_DOUBLE;
 
             // Load all data
             mm_1 = VEC_LOAD_PD(matchMatrixVec + topIndex);
@@ -884,8 +1021,12 @@ inline int32_t computationStep(const INT_TYPE *paddedReadLengths, const INT_TYPE
     {
         double finalSumProbabilities = 0.0;
 
-        for (int32_t j = 1; j < paddedHaplotypeLength[i]; j++)
+        for (INT_TYPE j = 1; j < paddedHaplotypeLength[i]; j++)
         {
+            // if (i == 0)
+            // {
+            //     printf("j = %d matchMatrix = %f insertionMatrix = %f\n", int32_t(j), matchMatrixVec[j * SIMD_WIDTH_DOUBLE + i], insertionMatrixVec[j * SIMD_WIDTH_DOUBLE + i]);
+            // }
             finalSumProbabilities += matchMatrixVec[j * SIMD_WIDTH_DOUBLE + i] + insertionMatrixVec[j * SIMD_WIDTH_DOUBLE + i];
         }
         result[i] = log10(finalSumProbabilities) - INITIAL_CONDITION_LOG10;
@@ -987,15 +1128,15 @@ int32_t initializeStep1(const int8_t *read_ins_qual, const int8_t *read_del_qual
     INT_TYPE qual_size = maxReadLength * SIMD_WIDTH_DOUBLE;
     INT_TYPE transition_vec_size = TRANS_PROB_ARRAY_LENGTH * (maxReadLength + 1) * SIMD_WIDTH_DOUBLE;
 
-    initializeProbabilitiesVec(transitionVec, read_ins_qual_vec, read_del_qual_vec, gcp_vec, currMaxReadLength, matchToMatchProb, qualToErrorProbCache, qual_size, transition_vec_size);
+    int32_t status = initializeProbabilitiesVec(transitionVec, read_ins_qual_vec, read_del_qual_vec, gcp_vec, currMaxReadLength, matchToMatchProb, qualToErrorProbCache, qual_size, transition_vec_size);
 
     _mm_free(read_ins_qual_vec);
     _mm_free(read_del_qual_vec);
     _mm_free(gcp_vec);
-    return PDHMM_SUCCESS;
+    return status;
 }
 
-INT_TYPE initializeStep2(const int8_t *hap_bases, const int8_t *hap_pdbases, const int8_t *read_bases, const int8_t *read_qual, const INT_TYPE *hap_bases_length, const INT_TYPE *read_bases_length, INT_TYPE *&hap_pdbases_vec, INT_TYPE currMaxPaddedHaplotypeLength, INT_TYPE currMaxPaddedReadLength, bool &constantsAreInitialized, double *priorVec, const double *qualToErrorProbCache, int32_t maxReadLength, int32_t maxHaplotypeLength)
+int32_t initializeStep2(const int8_t *hap_bases, const int8_t *hap_pdbases, const int8_t *read_bases, const int8_t *read_qual, const INT_TYPE *hap_bases_length, const INT_TYPE *read_bases_length, INT_TYPE *&hap_pdbases_vec, INT_TYPE currMaxPaddedHaplotypeLength, INT_TYPE currMaxPaddedReadLength, bool &constantsAreInitialized, double *priorVec, const double *qualToErrorProbCache, int32_t maxReadLength, int32_t maxHaplotypeLength)
 {
     INT_TYPE *hap_bases_vec = (INT_TYPE *)_mm_malloc(maxHaplotypeLength * SIMD_WIDTH_DOUBLE * sizeof(INT_TYPE), ALIGN_SIZE);
     hap_pdbases_vec = (INT_TYPE *)_mm_malloc(maxHaplotypeLength * SIMD_WIDTH_DOUBLE * sizeof(INT_TYPE), ALIGN_SIZE);
@@ -1129,7 +1270,7 @@ int32_t computeReadLikelihoodGivenHaplotypeLog10Vec(const int8_t *hap_bases, con
 
     if (status != PDHMM_SUCCESS)
     {
-        _mm_free(hap_pdbases_vec);
+        // _mm_free(hap_pdbases_vec);
         _mm_free(paddedReadLengths);
         _mm_free(paddedHaplotypeLengths);
         _mm_free(recacheReadValues);
@@ -1284,6 +1425,8 @@ int32_t CONCAT(computePDHMM_, SIMD_ENGINE)(const int8_t *hap_bases, const int8_t
         for (int32_t i = 0; i < roundedBatchSize; i += SIMD_WIDTH_DOUBLE)
         {
             initializeVec(matchMatrixVec, insertionMatrixVec, deletionMatrixVec, branchMatchMatrixVec, branchInsertionMatrixVec, branchDeletionMatrixVec, *constantsAreInitialized, *initialized, maxHaplotypeLength); // array allocation
+            // memset(transitionVec, 0, TRANS_PROB_ARRAY_LENGTH * paddedMaxReadLength * SIMD_WIDTH_DOUBLE * totalThreads * sizeof(double));
+            // memset(priorVec, 0, paddedMaxHaplotypeLength * paddedMaxReadLength * SIMD_WIDTH_DOUBLE * totalThreads * sizeof(double));
             for (int32_t j = 0; j < SIMD_WIDTH_DOUBLE; j++)
             {
                 prev_hap_bases_length[j] = -1;
