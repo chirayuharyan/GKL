@@ -23,6 +23,7 @@
  */
 #include "IntelPDHMM.h"
 #include <debug.h>
+#include "pdhmm-common.h"
 #include "pdhmm-serial.h"
 #include "avx2_impl.h"
 #ifndef __APPLE__
@@ -76,6 +77,7 @@ JNIEXPORT void JNICALL Java_com_intel_gkl_pdhmm_IntelPDHMM_initNative(JNIEnv *en
         INFO("Using Serial Implementation.");
         g_computePDHMM = computePDHMM_serial; // todo: rename scalar : verify if it is openmp
     }
+    initializeCache();
 }
 
 /*

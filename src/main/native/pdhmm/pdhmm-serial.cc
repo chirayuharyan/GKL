@@ -446,7 +446,7 @@ int32_t computePDHMM_serial(const int8_t *hap_bases, const int8_t *hap_pdbases, 
             status = currStatus;
     }
     freeTables(matchMatrix, insertionMatrix, deletionMatrix, branchMatchMatrix, branchInsertionMatrix, branchDeletionMatrix, transition, prior);
-    freeInit(matchToMatchLog10, matchToMatchProb, qualToErrorProbCache, qualToProbLog10Cache);
+    // freeInit(matchToMatchLog10, matchToMatchProb, qualToErrorProbCache, qualToProbLog10Cache);
     return status;
 }
 
