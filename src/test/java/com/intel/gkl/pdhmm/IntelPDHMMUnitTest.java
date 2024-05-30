@@ -1,6 +1,8 @@
 package com.intel.gkl.pdhmm;
 
 import com.intel.gkl.IntelGKLUtils;
+import com.intel.gkl.pdhmm.IntelPDHMM.OptimizationLevel;
+
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -112,7 +114,7 @@ public class IntelPDHMMUnitTest {
                         readBasesFull, readQualsFull, readInsQualsFull, readDelQualsFull,
                         overallGCPFull, hapLength,
                         readLength,
-                        testcase, max_hap_length, max_read_length);
+                        testcase, max_hap_length, max_read_length, OptimizationLevel.AVX512);
                 long end = System.nanoTime();
                 System.out.println("Total Elapsed Time = " + (end - start) / 1e9);
                 // Check Values

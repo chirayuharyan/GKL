@@ -34,6 +34,9 @@
 #define CAT(X, Y) X##Y
 #define CONCAT(X, Y) CAT(X, Y)
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 #define PDHMM_SUCCESS 0
 #define PDHMM_MEMORY_ALLOCATION_FAILED 1
 #define PDHMM_INPUT_DATA_ERROR 2

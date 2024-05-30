@@ -1176,6 +1176,7 @@ int32_t computeReadLikelihoodGivenHaplotypeLog10Vec(const int8_t *hap_bases, con
 
 int32_t CONCAT(computePDHMM_, SIMD_ENGINE)(const int8_t *hap_bases, const int8_t *hap_pdbases, const int8_t *read_bases, const int8_t *read_qual, const int8_t *read_ins_qual, const int8_t *read_del_qual, const int8_t *gcp, double *result, int64_t t, const int64_t *hap_lengths, const int64_t *read_lengths, int32_t maxReadLength, int32_t maxHaplotypeLength)
 {
+    printf("Using %s Version\n", TOSTRING(SIMD_ENGINE));
     int32_t totalThreads = 1;
 #ifdef _OPENMP // todo: Add openmp block in initNative
 #pragma omp parallel

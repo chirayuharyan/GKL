@@ -38,6 +38,14 @@ public class IntelPDHMM implements NativeLibrary {
         initialized = false;
     }
 
+    public enum OptimizationLevel {
+        DEFAULT,
+        SCALAR,
+        AVX2,
+        AVX512,
+
+    }
+
     @Override
     public boolean load(File tempDir) {
         synchronized (lock_class) {
@@ -54,7 +62,15 @@ public class IntelPDHMM implements NativeLibrary {
 
     public double[] computePDHMM(byte[] hap_bases, byte[] hap_pdbases, byte[] read_bases, byte[] read_qual,
             byte[] read_ins_qual, byte[] read_del_qual, byte[] gcp, long[] hap_lengths, long[] read_lengths,
-            int testcase, int maxHapLength, int maxReadLength)
+            int testcase, int maxHapLength, int maxReadLength) {
+        return computePDHMM(hap_bases, hap_pdbases, read_bases, read_qual,
+                read_ins_qual, read_del_qual, gcp, hap_lengths, read_lengths,
+                testcase, maxHapLength, maxReadLength, OptimizationLevel.DEFAULT);
+    }
+
+    public double[] computePDHMM(byte[] hap_bases, byte[] hap_pdbases, byte[] read_bases, byte[] read_qual,
+            byte[] read_ins_qual, byte[] read_del_qual, byte[] gcp, long[] hap_lengths, long[] read_lengths,
+            int testcase, int maxHapLength, int maxReadLength, OptimizationLevel optimizationLevel)
             throws RuntimeException, OutOfMemoryError {
         if (hap_bases == null || hap_bases.length != maxHapLength * testcase)
             throw new IllegalArgumentException("hap_bases array is null or of wrong size.");
@@ -82,7 +98,7 @@ public class IntelPDHMM implements NativeLibrary {
         try {
             return computePDHMMNative(hap_bases, hap_pdbases, read_bases, read_qual,
                     read_ins_qual, read_del_qual, gcp, hap_lengths, read_lengths,
-                    testcase, maxHapLength, maxReadLength);
+                    testcase, maxHapLength, maxReadLength, optimizationLevel.ordinal());
         } catch (OutOfMemoryError e) {
             throw new OutOfMemoryError(
                     "OutOfMemory exception thrown from native pdhmm function call " + e.getMessage());
@@ -100,5 +116,5 @@ public class IntelPDHMM implements NativeLibrary {
     private native double[] computePDHMMNative(byte[] hap_bases, byte[] hap_pdbases, byte[] read_bases,
             byte[] read_qual,
             byte[] read_ins_qual, byte[] read_del_qual, byte[] gcp, long[] hap_lengths, long[] read_lengths,
-            int testcase, int maxHapLength, int maxReadLength);
+            int testcase, int maxHapLength, int maxReadLength, int optimizationLevel);
 }

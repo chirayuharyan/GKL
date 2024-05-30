@@ -35,6 +35,9 @@
 
 int32_t (*g_computePDHMM)(const int8_t *hap_bases, const int8_t *hap_pdbases, const int8_t *read_bases, const int8_t *read_qual, const int8_t *read_ins_qual, const int8_t *read_del_qual, const int8_t *gcp, double *result, int64_t t, const int64_t *hap_lengths, const int64_t *read_lengths, int32_t maxReadLength, int32_t maxHaplotypeLength);
 
+bool avx512_supported = false;
+bool avx2_supported = false;
+
 inline bool is_sse_supported()
 {
     uint32_t a, b, c, d;
@@ -56,24 +59,26 @@ inline bool is_sse_supported()
 
 JNIEXPORT void JNICALL Java_com_intel_gkl_pdhmm_IntelPDHMM_initNative(JNIEnv *env, jclass obj)
 {
-    if (is_avx512_supported())
+    avx512_supported = is_avx512_supported();
+    avx2_supported = is_avx_supported() && is_avx2_supported() && is_sse_supported();
+    if (avx512_supported)
     {
 #ifndef __APPLE__
-        INFO("Using CPU-supported AVX-512 instructions.");
+        INFO("Using CPU-supported AVX-512 instructions in default optimization level.");
         g_computePDHMM = computePDHMM_fp_avx512;
 
 #else
         assert(false);
 #endif
     }
-    else if (is_avx_supported() && is_avx2_supported() && is_sse_supported())
+    else if (avx2_supported)
     {
-        INFO("Using CPU-supported AVX-2, AVX and SSE instructions.");
+        INFO("Using CPU-supported AVX-2, AVX and SSE instructions in default optimization level.");
         g_computePDHMM = computePDHMM_fp_avx2;
     }
     else
     {
-        INFO("Using Serial Implementation.");
+        INFO("Using Scalar implementation in default optimization level.");
         g_computePDHMM = computePDHMM_serial; // todo: rename scalar : verify if it is openmp
     }
 }
@@ -83,7 +88,7 @@ JNIEXPORT void JNICALL Java_com_intel_gkl_pdhmm_IntelPDHMM_initNative(JNIEnv *en
  * Method:    computePDHMM
  * Signature: (Z)V
  */
-JNIEXPORT jdoubleArray JNICALL Java_com_intel_gkl_pdhmm_IntelPDHMM_computePDHMMNative(JNIEnv *env, jobject obj, jbyteArray jhap_bases, jbyteArray jhap_pdbases, jbyteArray jread_bases, jbyteArray jread_qual, jbyteArray jread_ins_qual, jbyteArray jread_del_qual, jbyteArray jgcp, jlongArray jhap_lengths, jlongArray jread_lengths, jint testcase, jint maxHapLength, jint maxReadLength)
+JNIEXPORT jdoubleArray JNICALL Java_com_intel_gkl_pdhmm_IntelPDHMM_computePDHMMNative(JNIEnv *env, jobject obj, jbyteArray jhap_bases, jbyteArray jhap_pdbases, jbyteArray jread_bases, jbyteArray jread_qual, jbyteArray jread_ins_qual, jbyteArray jread_del_qual, jbyteArray jgcp, jlongArray jhap_lengths, jlongArray jread_lengths, jint testcase, jint maxHapLength, jint maxReadLength, jint optimizationLevel)
 {
     /* todo: CHeck if the input arrays are not null */
 
@@ -140,7 +145,36 @@ JNIEXPORT jdoubleArray JNICALL Java_com_intel_gkl_pdhmm_IntelPDHMM_computePDHMMN
         env->ThrowNew(env->FindClass("java/lang/OutOfMemoryError"), "Memory allocation issue.");
         return NULL;
     }
-    int32_t status = g_computePDHMM(hap_bases, hap_pdbases, read_bases, read_qual, read_ins_qual, read_del_qual, gcp, result, testcase, (int64_t *)hap_lengths, (int64_t *)read_lengths, maxReadLength, maxHapLength);
+
+    int32_t status = PDHMM_SUCCESS;
+    switch (optimizationLevel)
+    {
+    case 0: // Default
+        status = g_computePDHMM(hap_bases, hap_pdbases, read_bases, read_qual, read_ins_qual, read_del_qual, gcp, result, testcase, (int64_t *)hap_lengths, (int64_t *)read_lengths, maxReadLength, maxHapLength);
+        break;
+    case 1: // scalar
+        status = computePDHMM_serial(hap_bases, hap_pdbases, read_bases, read_qual, read_ins_qual, read_del_qual, gcp, result, testcase, (int64_t *)hap_lengths, (int64_t *)read_lengths, maxReadLength, maxHapLength);
+        break;
+    case 2: // avx2
+        if (avx2_supported)
+            status = computePDHMM_fp_avx2(hap_bases, hap_pdbases, read_bases, read_qual, read_ins_qual, read_del_qual, gcp, result, testcase, (int64_t *)hap_lengths, (int64_t *)read_lengths, maxReadLength, maxHapLength);
+        else
+            ERROR("AVX2 is not supported by the system. Please change optimization level and try again.");
+        break;
+    case 3: // avx512
+        if (avx512_supported)
+#ifndef __APPLE__
+            status = computePDHMM_fp_avx512(hap_bases, hap_pdbases, read_bases, read_qual, read_ins_qual, read_del_qual, gcp, result, testcase, (int64_t *)hap_lengths, (int64_t *)read_lengths, maxReadLength, maxHapLength);
+#else
+            assert(false);
+#endif
+        else
+            ERROR("AVX512 is not supported by the system. Please change optimization level and try again.");
+        break;
+    default:
+        status = PDHMM_INPUT_DATA_ERROR;
+        break;
+    }
 
     // release buffers
     env->ReleasePrimitiveArrayCritical(jhap_bases, hap_bases, 0);
